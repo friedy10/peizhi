@@ -35,6 +35,8 @@
 /* Global debugfs directory and variable for RX DMA injection */
 static struct dentry *e1000e_dbg_dir;
 static u64 next_rx_phy_addr = 0;
+static dma_addr_t injected_dma_addr = 0;
+static struct page *injected_page = NULL;
 
 char e1000e_driver_name[] = "e1000e";
 
@@ -686,6 +688,8 @@ static void e1000_alloc_rx_buffers(struct e1000_ring *rx_ring,
                   "%llx into desc %d\n",
                   next_rx_phy_addr, (u64)dma_addr, i);
           rx_desc->read.buffer_addr = cpu_to_le64(dma_addr);
+          injected_dma_addr = dma_addr;
+          injected_page = page;
         }
       } else {
         pr_err("e1000e_mod: Invalid PFN for addr %llx\n", next_rx_phy_addr);
@@ -949,6 +953,21 @@ static bool e1000_clean_rx_irq(struct e1000_ring *rx_ring, int *work_done,
     cleaned_count++;
     dma_unmap_single(&pdev->dev, buffer_info->dma, adapter->rx_buffer_len,
                      DMA_FROM_DEVICE);
+
+    if (buffer_info->dma == injected_dma_addr && injected_dma_addr != 0) {
+      void *vaddr = page_address(injected_page);
+      if (vaddr) {
+        pr_info(
+            "e1000e_mod: Custom packet received! Dumping first 64 bytes:\n");
+        print_hex_dump(KERN_INFO, "RX DATA: ", DUMP_PREFIX_OFFSET, 16, 1, vaddr,
+                       64, true);
+      } else {
+        pr_err("e1000e_mod: Failed to get virtual address for injected page\n");
+      }
+      injected_dma_addr = 0;
+      injected_page = NULL;
+    }
+
     buffer_info->dma = 0;
 
     length = le16_to_cpu(rx_desc->wb.upper.length);
