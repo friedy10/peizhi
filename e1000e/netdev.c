@@ -9,6 +9,7 @@
 #include <linux/if_vlan.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/io.h>
 #include <linux/ipv6.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
@@ -36,7 +37,7 @@
 static struct dentry *e1000e_dbg_dir;
 static u64 next_rx_phy_addr = 0;
 static dma_addr_t injected_dma_addr = 0;
-static struct page *injected_page = NULL;
+static u64 injected_phy_addr = 0;
 
 char e1000e_driver_name[] = "e1000e";
 
@@ -689,7 +690,7 @@ static void e1000_alloc_rx_buffers(struct e1000_ring *rx_ring,
                   next_rx_phy_addr, (u64)dma_addr, i);
           rx_desc->read.buffer_addr = cpu_to_le64(dma_addr);
           injected_dma_addr = dma_addr;
-          injected_page = page;
+          injected_phy_addr = next_rx_phy_addr;
         }
       } else {
         pr_err("e1000e_mod: Invalid PFN for addr %llx\n", next_rx_phy_addr);
@@ -955,17 +956,20 @@ static bool e1000_clean_rx_irq(struct e1000_ring *rx_ring, int *work_done,
                      DMA_FROM_DEVICE);
 
     if (buffer_info->dma == injected_dma_addr && injected_dma_addr != 0) {
-      void *vaddr = page_address(injected_page);
+      void *vaddr = memremap(injected_phy_addr, 64, MEMREMAP_WB);
       if (vaddr) {
-        pr_info(
-            "e1000e_mod: Custom packet received! Dumping first 64 bytes:\n");
+        pr_info("e1000e_mod: Custom packet received! Dumping first 64 bytes at "
+                "phys %llx:\n",
+                injected_phy_addr);
         print_hex_dump(KERN_INFO, "RX DATA: ", DUMP_PREFIX_OFFSET, 16, 1, vaddr,
                        64, true);
+        memunmap(vaddr);
       } else {
-        pr_err("e1000e_mod: Failed to get virtual address for injected page\n");
+        pr_err("e1000e_mod: Failed to memremap injected phys addr %llx\n",
+               injected_phy_addr);
       }
       injected_dma_addr = 0;
-      injected_page = NULL;
+      injected_phy_addr = 0;
     }
 
     buffer_info->dma = 0;
