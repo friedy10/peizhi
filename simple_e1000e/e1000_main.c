@@ -438,10 +438,28 @@ static int e1000_probe(struct pci_dev *pdev, const struct pci_device_id *ent) {
 
   netdev->netdev_ops = &e1000_netdev_ops;
   netdev->netdev_ops = &e1000_netdev_ops;
-  /* Hardcode MAC: DE:AD:BE:EF:CA:FE */
+  /* Read MAC from Hardware (RAL0/RAH0/NVM) */
   {
-    u8 mac[6] = {0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE};
+    u32 ral = readl(adapter->hw_addr + E1000_RAL0);
+    u32 rah = readl(adapter->hw_addr + E1000_RAH0);
+    u8 mac[6];
+
+    /* RAL0: Low 32 bits */
+    mac[0] = ral & 0xFF;
+    mac[1] = (ral >> 8) & 0xFF;
+    mac[2] = (ral >> 16) & 0xFF;
+    mac[3] = (ral >> 24) & 0xFF;
+    /* RAH0: High 16 bits */
+    mac[4] = rah & 0xFF;
+    mac[5] = (rah >> 8) & 0xFF;
+
+    /* If hardware has no valid address (all 0s), falling back to random might
+       be wise, but user requested default. If 0, we trust it or let upper
+       layers consistency verify. */
+
     memcpy(netdev->dev_addr, mac, 6);
+    /* Also set permanent address */
+    memcpy(netdev->perm_addr, mac, 6);
   }
 
   pr_info("%s: Assigned MAC: %pM\n", DRV_NAME, netdev->dev_addr);

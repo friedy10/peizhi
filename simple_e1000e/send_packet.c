@@ -33,8 +33,10 @@ int main(int argc, char *argv[]) {
   int tx_len = 0;
 
   if (argc == 2) {
-    /* Default MAC if not provided */
-    parse_mac("de:ad:be:ef:ca:fe", target_mac);
+    /* Default MAC if not provided: Broadcast */
+    parse_mac("ff:ff:ff:ff:ff:ff", target_mac);
+    printf("No target MAC provided, defaulting to Broadcast "
+           "(ff:ff:ff:ff:ff:ff)\n");
   } else if (argc == 3) {
     if (parse_mac(argv[2], target_mac) != 0) {
       fprintf(stderr, "Invalid MAC address format: %s\n", argv[2]);
