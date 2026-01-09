@@ -142,10 +142,10 @@ static void e1000_configure_rx(struct simple_e1000_adapter *adapter) {
   e1000_alloc_rx_buffers(adapter);
 
   /* Enable Receiver */
-  /* EN (Enable), BAM (Broadcast Accept), UPE (Unicast Promiscuous), SZ_2048
-   * (Size), SECRC (Strip CRC) */
-  rctl = E1000_RCTL_EN | E1000_RCTL_BAM | E1000_RCTL_UPE | E1000_RCTL_SZ_2048 |
-         E1000_RCTL_SECRC;
+  /* Enable RX, Unicast/Multicast Promiscuous, Broadcast Accept, Long Packet
+   * Enable, Strip CRC */
+  rctl = E1000_RCTL_EN | E1000_RCTL_UPE | E1000_RCTL_MPE | E1000_RCTL_LPE |
+         E1000_RCTL_BAM | E1000_RCTL_SZ_2048 | E1000_RCTL_SECRC;
   E1000_WRITE_REG(hw, E1000_RCTL, rctl);
 }
 
